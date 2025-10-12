@@ -1,10 +1,11 @@
 --[[
-  LennonXpremium - Panel Premium (botones visibles)
-  - Título + avatar circular
+  LennonXpremium - Panel Premium (completo con headshot robusto)
+  - Título + avatar circular (rbxthumb:// + fallback)
   - Input grande de key
-  - Fila de botones: Get Key / Submit (o apilados en móviles)
-  - Borde rainbow sutil animado
-  - Toasts y validación de key
+  - Botones visibles: Get Key / Submit (fila; se apilan en móvil)
+  - Borde rainbow sutil animado (card, avatar ring, controles)
+  - Toasts apilables, validación de key
+  - Atajos: Enter => Submit, Ctrl+K => Get Key
 --]]
 
 -------------------- Config --------------------
@@ -31,9 +32,7 @@ local function safeClipboard(s)
 	return false
 end
 
-local function isValidKey(s)
-	return (type(s) == "string") and (#s >= MIN_KEY_LEN)
-end
+local function isValidKey(s) return (type(s)=="string") and (#s >= MIN_KEY_LEN) end
 
 local RAINBOW = ColorSequence.new({
 	ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255, 120, 120)),
@@ -45,9 +44,9 @@ local RAINBOW = ColorSequence.new({
 })
 
 local function animateRainbow(uiGradient, period)
-	period = period or 10
+	period = period or 12
 	task.spawn(function()
-		while uiGradient.Parent do
+		while uiGradient and uiGradient.Parent do
 			uiGradient.Rotation = 0
 			local tw = TweenService:Create(uiGradient, TweenInfo.new(period, Enum.EasingStyle.Linear), {Rotation = 360})
 			tw:Play(); tw.Completed:Wait()
@@ -90,7 +89,7 @@ local function makeToastHost(parent)
 		stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 		local g = Instance.new("UIGradient", stroke)
 		g.Color = RAINBOW; g.Rotation = 0
-		animateRainbow(g, 12)
+		animateRainbow(g, 14)
 
 		local lbl = Instance.new("TextLabel", frame)
 		lbl.BackgroundTransparency = 1
@@ -120,7 +119,7 @@ local function makeToastHost(parent)
 	return {push = push}
 end
 
--- Envoltorio con borde rainbow
+-- Envoltorio con borde gradient rainbow
 local function gradientBorderWrap(parent, cornerRadius, thickness)
 	thickness = thickness or 2
 	local wrap = Instance.new("Frame")
@@ -141,7 +140,7 @@ local function gradientBorderWrap(parent, cornerRadius, thickness)
 	local grad = Instance.new("UIGradient", border)
 	grad.Color = RAINBOW
 	grad.Rotation = 0
-	animateRainbow(grad, 14)
+	animateRainbow(grad, 16)
 
 	local inner = Instance.new("Frame", wrap)
 	inner.BackgroundColor3 = Color3.fromRGB(22,22,28)
@@ -154,9 +153,33 @@ local function gradientBorderWrap(parent, cornerRadius, thickness)
 	return wrap, inner
 end
 
+-- Headshot robusto: usa rbxthumb:// con fallback a GetUserThumbnailAsync
+local function setHeadshot(imgLabel, userId)
+	local W,H = 180,180
+	imgLabel.ImageTransparency = 0
+	imgLabel.BackgroundTransparency = 1
+	imgLabel.ScaleType = Enum.ScaleType.Crop
+	imgLabel.Image = ("rbxthumb://type=AvatarHeadShot&id=%d&w=%d&h=%d"):format(userId, W, H)
+
+	-- Fallback si por alguna razón quedara vacío
+	task.delay(0.6, function()
+		if not imgLabel.Image or imgLabel.Image == "" then
+			local ok, content, ready = pcall(function()
+				local c, r = Players:GetUserThumbnailAsync(userId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size180)
+				return c, r
+			end)
+			if ok and ready and content and content ~= "" then
+				imgLabel.Image = content
+			else
+				imgLabel.Image = "rbxasset://textures/ui/GuiImagePlaceholder.png"
+			end
+		end
+	end)
+end
+
 -------------------- GUI root --------------------
 local screen = Instance.new("ScreenGui")
-screen.Name = "LennonXpremium_FixedButtons"
+screen.Name = "LennonXpremium_UI"
 screen.IgnoreGuiInset = true
 screen.ResetOnSpawn = false
 screen.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
@@ -221,25 +244,13 @@ ringWrap.Size = UDim2.fromScale(1,1)
 ringInner.BackgroundColor3 = Color3.fromRGB(18,18,24)
 
 local avatar = Instance.new("ImageLabel", ringInner)
+avatar.Name = "AvatarHead"
 avatar.BackgroundTransparency = 1
 avatar.Size = UDim2.fromScale(1,1)
 avatar.ScaleType = Enum.ScaleType.Crop
 Instance.new("UICorner", avatar).CornerRadius = UDim.new(1,0)
 
-task.spawn(function()
-	for i=1,12 do
-		local ok, url, ready = pcall(function()
-			local content, isReady = Players:GetUserThumbnailAsync(player.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size180)
-			return content, isReady
-		end)
-		if ok and ready and url then
-			avatar.Image = url
-			return
-		end
-		task.wait(0.2)
-	end
-	avatar.Image = "rbxasset://textures/ui/GuiImagePlaceholder.png"
-end)
+setHeadshot(avatar, player.UserId)
 
 local titleWrap = Instance.new("Frame", header)
 titleWrap.BackgroundTransparency = 1
@@ -268,18 +279,19 @@ subLbl.Position = UDim2.fromScale(0,0.62)
 -------------------- Body --------------------
 local body = Instance.new("Frame", card)
 body.BackgroundTransparency = 1
-body.Size = UDim2.new(1,0,1,-(84+80+16)) -- header + buttons + padding
+body.Size = UDim2.new(1,0,1,-(84+80+16))
 body.LayoutOrder = 2
 
 local blist = Instance.new("UIListLayout", body)
 blist.FillDirection = Enum.FillDirection.Vertical
 blist.Padding = UDim.new(0, 12)
 
--- Input key
+-- Input key con borde rainbow
 local keyWrap, keyInner = gradientBorderWrap(body, 12, 2)
 keyWrap.Size = UDim2.new(1,0,0,64)
 
 local keyBox = Instance.new("TextBox", keyInner)
+keyBox.Name = "KeyInput"
 keyBox.BackgroundTransparency = 1
 keyBox.Size = UDim2.fromScale(1,1)
 keyBox.ClearTextOnFocus = false
@@ -299,7 +311,7 @@ hint.TextScaled = true
 hint.TextColor3 = Color3.fromRGB(175,175,195)
 hint.Size = UDim2.new(1,0,0,24)
 
--------------------- Buttons Row (¡AQUÍ ESTÁN!) --------------------
+-------------------- Buttons Row --------------------
 local buttonsRow = Instance.new("Frame", card)
 buttonsRow.BackgroundTransparency = 1
 buttonsRow.Size = UDim2.new(1,0,0,80)
@@ -312,10 +324,8 @@ rowList.Padding = UDim.new(0, 14)
 rowList.HorizontalAlignment = Enum.HorizontalAlignment.Center
 rowList.VerticalAlignment = Enum.VerticalAlignment.Center
 
--- Factores responsive
 local function makeButton(parent, text)
 	local wrap, inner = gradientBorderWrap(parent, 12, 2)
-	wrap.BackgroundTransparency = 0 -- visible
 	inner.BackgroundColor3 = Color3.fromRGB(34,34,44)
 
 	local btn = Instance.new("TextButton", inner)
@@ -326,7 +336,6 @@ local function makeButton(parent, text)
 	btn.Font = Enum.Font.GothamBold
 	btn.TextColor3 = Color3.fromRGB(255,255,255)
 
-	-- Hover micro-glow
 	local glow = Instance.new("UIStroke", inner)
 	glow.Thickness = 0.6
 	glow.Color = Color3.fromRGB(255,255,255)
@@ -346,25 +355,27 @@ local function makeButton(parent, text)
 	return wrap, inner, btn
 end
 
-local getKeyWrap, _, getKeyBtn = makeButton(buttonsRow, "Get Key")
-local submitWrap, _, submitBtn = makeButton(buttonsRow, "Submit")
+local getKeyWrapB, _, getKeyBtn = makeButton(buttonsRow, "Get Key")
+local submitWrapB, _, submitBtn = makeButton(buttonsRow, "Submit")
 
--- Tamaños visibles por defecto
-getKeyWrap.Size = UDim2.fromScale(0.48, 1)
-submitWrap.Size = UDim2.fromScale(0.48, 1)
+getKeyWrapB.Size = UDim2.fromScale(0.48, 1)
+submitWrapB.Size = UDim2.fromScale(0.48, 1)
 
--- Responsive: apilar si estrecho
+-- Responsive: apilar en pantallas estrechas y adaptar tamaño de la card
 local function updateResponsive()
-	if screen.AbsoluteSize.X < 760 then
+	local w = screen.AbsoluteSize.X
+	if w < 760 then
 		rowList.FillDirection = Enum.FillDirection.Vertical
 		buttonsRow.Size = UDim2.new(1,0,0,140)
-		getKeyWrap.Size = UDim2.fromScale(1, 0.48)
-		submitWrap.Size = UDim2.fromScale(1, 0.48)
+		getKeyWrapB.Size = UDim2.fromScale(1, 0.48)
+		submitWrapB.Size = UDim2.fromScale(1, 0.48)
+		cardWrap.Size = UDim2.fromScale(0.92, 0.56)
 	else
 		rowList.FillDirection = Enum.FillDirection.Horizontal
 		buttonsRow.Size = UDim2.new(1,0,0,80)
-		getKeyWrap.Size = UDim2.fromScale(0.48, 1)
-		submitWrap.Size = UDim2.fromScale(0.48, 1)
+		getKeyWrapB.Size = UDim2.fromScale(0.48, 1)
+		submitWrapB.Size = UDim2.fromScale(0.48, 1)
+		cardWrap.Size = UDim2.fromScale(0.64, 0.52)
 	end
 end
 updateResponsive()
@@ -377,7 +388,7 @@ local submitting = false
 local function setSubmitEnabled(on)
 	submitBtn.Active = on
 	submitBtn.AutoButtonColor = on
-	submitWrap.BackgroundTransparency = on and 0 or 0.06
+	submitWrapB.BackgroundTransparency = on and 0 or 0.06
 end
 setSubmitEnabled(false)
 
@@ -395,8 +406,9 @@ local function bounce(wrapFrame)
 	end)
 end
 
+-- Get Key
 getKeyBtn.MouseButton1Click:Connect(function()
-	bounce(getKeyWrap)
+	bounce(getKeyWrapB)
 	if safeClipboard(COPY_LINK) then
 		toastsHost.push("enlace copiado al portapapeles!")
 	else
@@ -405,6 +417,7 @@ getKeyBtn.MouseButton1Click:Connect(function()
 	end
 end)
 
+-- Submit
 local function doSubmit()
 	if submitting then return end
 	if not isValidKey(keyBox.Text) then
@@ -413,7 +426,7 @@ local function doSubmit()
 	end
 	submitting = true
 	setSubmitEnabled(false)
-	bounce(submitWrap)
+	bounce(submitWrapB)
 
 	local old = "Submit"; submitBtn.Text = "Submitting..."
 	task.delay(0.6, function()
