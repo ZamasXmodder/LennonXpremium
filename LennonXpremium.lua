@@ -7,7 +7,7 @@ G.__LENNONX_LOGIN_RUNNING = true
 
 -- === Config ===
 local REQUIRED_KEY  = "002288"               -- <— Version
-local GET_KEY_LINK  = "https://zamasxmodder.github.io/LennonXmodderWebHub/" -- <— tu link real
+local GET_KEY_LINK  = "https://zamasxmodder.github.io/LennonXpremiumWeb/" -- <— tu link real
 local COPY_ON_GET   = true
 local TOGGLE_KEY    = Enum.KeyCode.T
 
